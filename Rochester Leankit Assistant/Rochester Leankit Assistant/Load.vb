@@ -13,8 +13,6 @@ Public Class Load
 
     Private Async Sub FormShown(sender As Object, e As EventArgs) Handles Me.Shown
         Refresh()
-        'Dim Download = New Thread(AddressOf resourceDownload)
-        'Download.Start()
         Await (Task.Run(Sub() resourceDownload()))
         Login.Show()
         Hide()

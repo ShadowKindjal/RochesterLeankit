@@ -25,7 +25,7 @@ Public Class Leankit
         Public Shared Id As String
         Public Shared Description As String
 
-        Public Shared Function Retrieve()
+        Public Function Retrieve()
             Try
                 Dim Leankit As New Web
                 Return (Leankit.Request("https://" & Account.Name & ".leankitkanban.com/Kanban/Api/Boards/" & Id, "Get", String.Empty, Account.Credentials))
@@ -33,6 +33,26 @@ Public Class Leankit
                 MsgBox("There was an error while attempting to load the board. This user may not have permsision to use this software.")
                 Return Nothing
             End Try
+        End Function
+
+        Public Function RetrieveAll()
+            Dim ServerResponse As String = Nothing
+            Try
+                Dim Leankit As New Web
+                ServerResponse = (Leankit.Request("https://" & Account.Name & ".leankitkanban.com/Kanban/Api/Boards/", "Get", String.Empty, Account.Credentials))
+                Return ServerResponse
+            Catch ex As Exception
+                If ServerMessage(ServerResponse, ServerResponse.IndexOf("ReplyCode") + 11, ServerResponse.IndexOf("ReplyCode") + 14) <> "200" Then
+                    MsgBox("Your network credentials are incorrect. Please Try Again.")
+                Else
+                    MsgBox("There was an error while attempting to load the board. This user may not have permsision to use this software.")
+                End If
+                Return Nothing
+            End Try
+        End Function
+
+        Private Function ServerMessage(ByVal Message As String, ByVal DelimiterStart As Integer, ByVal DelimiterEnd As Integer)
+            Return Message.Substring(DelimiterStart, DelimiterEnd - DelimiterStart)
         End Function
     End Class
 
