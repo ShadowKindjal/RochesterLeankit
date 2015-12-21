@@ -1,0 +1,7 @@
+﻿Dim Resoucres As New MediaFire
+Dim Download = New Thread(Sub() Resoucres.getFile("ysm7h70z9ir5ll2", "Leankit", False, ".png"))
+Download.Start()
+Download.Join()
+Download = New Thread(Sub() Resoucres.getFile("lxo9gq2ty0on7cb", "Rochester", False, ".png"))
+Download.Start()
+Download.Join()
