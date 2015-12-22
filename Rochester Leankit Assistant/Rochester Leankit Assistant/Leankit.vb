@@ -51,6 +51,18 @@ Public Class Leankit
             End Try
         End Function
 
+        Public Function getIdentifiers()
+            Dim ServerResponse As String = Nothing
+            Try
+                Dim Leankit As New Web
+                ServerResponse = (Leankit.Request("https://" & Account.Name & ".leankitkanban.com/Kanban/Api/Board/" & Id & "/GetBoardIdentifiers", "Get", String.Empty, Account.Credentials))
+                Return ServerResponse
+            Catch ex As Exception
+                MsgBox("There was an error while attempting to load the board. This user may not have permsision to use this software. " & ex.Message)
+                Return Nothing
+            End Try
+        End Function
+
         Private Function ServerMessage(ByVal Message As String, ByVal DelimiterStart As Integer, ByVal DelimiterEnd As Integer)
             Return Message.Substring(DelimiterStart, DelimiterEnd - DelimiterStart)
         End Function

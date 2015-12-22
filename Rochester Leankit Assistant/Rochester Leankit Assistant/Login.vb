@@ -124,7 +124,7 @@ Public Class Login
             Dim ServerResponse As String = Board.RetrieveAll
 
             If ServerResponse <> Nothing Then
-                Controls("Login").Hide()
+                Controls.Clear()
 
                 Dim Text As New Label
                 Text.Text = "All Boards"
@@ -154,7 +154,7 @@ Public Class Login
                 Open.BackColor = Color.FromArgb(150, 201, 61)
                 Open.FlatAppearance.BorderColor = Color.FromArgb(150, 201, 61)
                 Open.Cursor = Cursors.Hand
-                AddHandler Button.Click, AddressOf LoginGUI
+                AddHandler Open.Click, AddressOf openBoard
                 Me.Controls.Add(Open)
 
                 Dim Panel As New ListView
@@ -163,7 +163,7 @@ Public Class Login
                 Panel.Location = New Point(Text.Location.X, 75)
                 Panel.View = View.List
                 Me.Controls.Add(Panel)
-                'AddHandler Panel.ItemSelectionChanged
+                AddHandler Panel.ItemSelectionChanged, AddressOf ListViewEnableButton
 
                 Dim SubMessage, IDString As String
                 Dim StartIndex As Integer = 0
@@ -193,6 +193,46 @@ Public Class Login
             MsgBox(ex.Message)
             LoginGUI()
         End Try
+    End Sub
+
+    Private Sub ListViewEnableButton()
+        Dim List As ListView = Controls("Panel")
+        Dim Open As Button = Controls("Open")
+        Dim Item As ListViewItem
+        Try
+            For Each Item In List.Items
+                If Item.Selected Then
+                    Open.Enabled = True
+                    Exit Sub
+                End If
+            Next
+            Open.Enabled = False
+        Catch ex As Exception
+        End Try
+    End Sub
+
+    Private Sub openBoard()
+        Dim List As ListView = Controls("Panel")
+        Dim Item As ListViewItem
+        Dim Board As New Leankit.Board
+
+        For Each Item In List.Items
+            If Item.Selected Then
+                Leankit.Board.Id = Item.Tag
+                Try
+                    Board.getIdentifiers()
+                    Dim Manager As New Manager
+                    Manager.Show()
+                    Manager.CurrentForm = Manager
+                    Hide()
+                    Dispose()
+                Catch ex As Exception
+                    MsgBox("There was an error while attempting to load the board. This user may not have permsision to use this software.")
+                    BoardPopulate()
+                End Try
+                Exit Sub
+            End If
+        Next
     End Sub
 
     Private Sub EnterClick(ByVal sender As Object, ByVal e As System.Windows.Forms.KeyEventArgs)
