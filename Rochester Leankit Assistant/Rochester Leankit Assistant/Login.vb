@@ -118,8 +118,10 @@ Public Class Login
 
     Private Sub BoardPopulate()
         Try
-            AutoFix()
-            Public_Vars()
+            If Not LoggedIn Then
+                AutoFix()
+                Public_Vars()
+            End If
             Dim Board As New Leankit.Board
             Dim ServerResponse As String = Board.RetrieveAll
 
@@ -190,7 +192,7 @@ Public Class Login
                 End While
             End If
         Catch ex As Exception
-            MsgBox(ex.Message)
+            'MsgBox(ex.Message)
             LoginGUI()
         End Try
     End Sub

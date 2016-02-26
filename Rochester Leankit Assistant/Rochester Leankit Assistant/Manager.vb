@@ -995,6 +995,298 @@ Public Class Manager
         End Try
     End Sub
 
+    Private Sub BoxConfig()
+        Dim Toolbar As Panel = Me.Controls("Toolbar")
+        Dim List As TreeView = Toolbar.Controls("List")
+        Dim RunList As ComboBox = Toolbar.Controls("Run")
+        Dim PartList(List.Nodes.Count) As Run.Part
+        Dim Count As Integer = 0
+        Dim Item As TreeNode
+
+        Dim xlApp As Excel.Application = New Excel.Application()
+
+        If xlApp Is Nothing Then
+            MessageBox.Show("Excel is not properly installed!!")
+            Return
+        End If
+
+        Dim xlWorkBook As Excel.Workbook = xlApp.Workbooks.Open(GetFolderPath(SpecialFolder.ApplicationData) & "\Rochester\ShippingWeights.xlsx")
+        Dim xlWorkSheet As Excel.Worksheet = xlWorkBook.Worksheets("sheet1")
+        Dim xlListObject As Excel.ListObject = xlWorkSheet.ListObjects("Table1")
+        Dim xlRange As Excel.Range = xlListObject.DataBodyRange
+        Dim WeightArray(xlListObject.ListRows.Count, xlListObject.ListColumns.Count)
+        WeightArray = xlRange.Value
+
+        ReDim Preserve PartList(Count)
+        For Each Item In List.Nodes
+            If Item.Checked Then
+                For x = 0 To Cards.Count - 1
+                    If x = Item.Tag Then
+                        Dim Part As New Run.Part
+                        Part.PartNumber = Cards(Item.Tag).Title
+                        Part.Lot = Cards(Item.Tag).LotNumber
+                        Part.Quantity = CardSize(Cards(Item.Tag).Title, Cards(Item.Tag).LotNumber, Cards(Item.Tag).Size)
+                        For n = 1 To xlListObject.ListRows.Count
+                            If InStr(Cards(Item.Tag).Title, WeightArray(n, 1)) > 0 Then
+                                Part.WireType = WeightArray(n, 2)
+                                Part.NeedlesPerSet = WeightArray(n, 3)
+                                Part.SetsPerBag = WeightArray(n, 4)
+                                Part.BagWeight = WeightArray(n, 5)
+                            End If
+                        Next
+                        Part.Calculate()
+                        ReDim Preserve PartList(Count)
+                        PartList(Count) = Part
+                        Count += 1
+                    End If
+                Next
+            End If
+        Next
+
+        Dim Shipment As New Form
+        aa = Shipment
+        Shipment.Controls.Clear()
+        Shipment.Text = "Rochester Leankit Assistant"
+        Shipment.Size = New Size(800, 500)
+        Shipment.Top = ((CurrentForm.Height - Shipment.Height) / 2) + CurrentForm.Top
+        Shipment.Left = ((CurrentForm.Width - Shipment.Width) / 2) + CurrentForm.Left
+        Shipment.BackColor = Color.White
+        Shipment.FormBorderStyle = FormBorderStyle.FixedDialog
+
+        Dim Board As New Panel
+        bb = Board
+        Board.BackColor = Color.FromArgb(197, 201, 190)
+        Board.AutoScroll = True
+        Board.Size = New Size(600, 500)
+        Board.Location = New Point(200, 0)
+        Shipment.Controls.Add(Board)
+
+        Count = 0
+        Dim Box As Run.Box = New Run.Box()
+        Dim BoxConfig() As Run.Box = Nothing
+
+        For x = 0 To PartList.Count - 1
+            Dim BoxPart As Run.Box.Part = New Run.Box.Part()
+            BoxPart.PartNumber = PartList(x).PartNumber
+            BoxPart.Lot = PartList(x).Lot
+
+            For y = 0 To PartList(x).TotalBags - 1
+                BoxPart.BagWeight += PartList(x).BagWeight
+                BoxPart.Bags += 1
+                Box.Weight += PartList(x).BagWeight
+
+                If Box.Weight > 30 Then
+                    Box.Parts.Add(BoxPart)
+                    ReDim Preserve BoxConfig(Count)
+                    BoxConfig(Count) = Box
+                    Box = New Run.Box
+                    Count += 1
+
+                    BoxPart = New Run.Box.Part()
+                    BoxPart.PartNumber = PartList(x).PartNumber
+                    BoxPart.Lot = PartList(x).Lot
+                End If
+            Next
+            Box.Parts.Add(BoxPart)
+        Next
+
+        Count = 0
+        Dim Start As Integer = 25
+
+        For x = 0 To BoxConfig.Count - 1
+
+            Dim BoxPanel As New Panel
+            BoxPanel.Tag = x
+            BoxPanel.Location = New Point(25, Start)
+            BoxPanel.BackColor = Color.White
+            AddHandler BoxPanel.MouseEnter, AddressOf mEnter
+
+            Dim Title As New Label
+            Title.Text = "Box " & x + 1
+            Title.Location = New Point(10, 10)
+            BoxPanel.Controls.Add(Title)
+            Dim PartPanel As New Panel
+
+            For y = 0 To BoxConfig(x).Parts.Count - 1
+
+                PartPanel = New Panel
+                PartPanel.Tag = y
+                PartPanel.Location = New Point(0, 35 + Count * 25)
+                PartPanel.BackColor = Color.LightGreen
+                BoxPanel.Controls.Add(PartPanel)
+                AddHandler PartPanel.MouseDown, AddressOf startDrag
+                AddHandler PartPanel.MouseMove, AddressOf whileDragging
+                AddHandler PartPanel.MouseUp, AddressOf endDrag
+
+                Dim tPart As New Label
+                tPart.AutoSize = True
+                tPart.Text = BoxConfig(x).Parts(y).PartNumber
+                tPart.Location = New Point(10, 0)
+                PartPanel.Controls.Add(tPart)
+
+                Dim tWeight As New Label
+                tWeight.AutoSize = True
+                tWeight.Text = BoxConfig(x).Parts(y).BagWeight
+                tWeight.Location = New Point(300, 0)
+                PartPanel.Controls.Add(tWeight)
+
+                Dim tQuantity As New Label
+                tQuantity.AutoSize = True
+                tQuantity.Text = BoxConfig(x).Parts(y).Bags
+                tQuantity.Location = New Point(400, 0)
+                PartPanel.Controls.Add(tQuantity)
+
+                PartPanel.Size = New Size(550, tPart.Height)
+                Count += 1
+            Next
+
+            Count = 0
+            Dim Weight As New Label
+            Weight.Text = BoxConfig(x).Weight
+            Weight.Location = New Point(10, PartPanel.Location.Y + PartPanel.Height + 12)
+            BoxPanel.Controls.Add(Weight)
+
+            BoxPanel.Size = New Size(550, Weight.Location.Y + Weight.Height + 12)
+            Board.Controls.Add(BoxPanel)
+            Start = BoxPanel.Location.Y + BoxPanel.Height + 15
+
+        Next
+
+        ee = PartList
+        dd = BoxConfig
+        Shipment.Show()
+        xlWorkSheet = Nothing
+        xlWorkBook = Nothing
+        xlApp.Quit()
+        xlApp = Nothing
+        GC.Collect()
+    End Sub
+
+    Dim dragging As Boolean
+    Dim startX As Integer
+    Dim startY As Integer
+
+    Dim aa As Form
+    Dim bb As Control
+    Dim cc As Integer
+    Dim cccc As Integer
+    Dim dd() As Run.Box
+    Dim ee() As Run.Part
+    Dim ff As Integer
+
+    Private Sub mEnter(ByVal sender As Object, ByVal e As EventArgs)
+        ff = sender.tag
+        MsgBox(ff)
+    End Sub
+
+    Private Sub startDrag(ByVal sender As Object, ByVal e As MouseEventArgs)
+        dragging = True
+        startX = e.X
+        startY = e.Y
+        cc = sender.parent.tag
+        cccc = sender.tag
+    End Sub
+
+    Private Sub whileDragging(ByVal sender As Object, ByVal e As MouseEventArgs)
+        If dragging = True Then
+            'bb.Controls.Add(sender)
+            'sender.BringToFront()
+            ''sender.Location = New Point(sender.Location.X + e.X - startX, sender.Location.Y + e.Y - startY)
+            'Me.Refresh()
+        End If
+    End Sub
+
+    Private Sub endDrag()
+        dragging = False
+
+        Dim PartList() As Run.Part = ee
+        Dim Count As Integer
+        Dim Shipment As Form = aa
+        Shipment.Controls.Clear()
+        Shipment.Text = "Rochester Leankit Assistant"
+        Shipment.Size = New Size(800, 500)
+        Shipment.Top = ((CurrentForm.Height - Shipment.Height) / 2) + CurrentForm.Top
+        Shipment.Left = ((CurrentForm.Width - Shipment.Width) / 2) + CurrentForm.Left
+        Shipment.BackColor = Color.White
+        Shipment.FormBorderStyle = FormBorderStyle.None
+
+        Dim Board As New Panel
+        bb = Board
+        Board.BackColor = Color.FromArgb(197, 201, 190)
+        Board.AutoScroll = True
+        Board.Size = New Size(600, 500)
+        Board.Location = New Point(200, 0)
+        Shipment.Controls.Add(Board)
+
+        Count = 0
+        Dim Box As Run.Box = New Run.Box()
+        Dim BoxConfig() As Run.Box = dd
+        BoxConfig(ff).Parts.Add(BoxConfig(cc).Parts(cccc))
+        'BoxConfig(cc).Parts.Remove(BoxConfig(cc).Parts(cccc))
+
+        Count = 0
+        Dim Start As Integer = 25
+
+        For x = 0 To BoxConfig.Count - 1
+
+            Dim BoxPanel As New Panel
+            BoxPanel.Tag = x
+            BoxPanel.Location = New Point(25, Start)
+            BoxPanel.BackColor = Color.White
+            AddHandler BoxPanel.MouseEnter, AddressOf mEnter
+
+            Dim Title As New Label
+            Title.Text = "Box " & x + 1
+            Title.Location = New Point(10, 10)
+            BoxPanel.Controls.Add(Title)
+            Dim PartPanel As New Panel
+
+            For y = 0 To BoxConfig(x).Parts.Count - 1
+
+                PartPanel = New Panel
+                PartPanel.Tag = y
+                PartPanel.Location = New Point(0, 35 + Count * 25)
+                PartPanel.BackColor = Color.LightGreen
+                BoxPanel.Controls.Add(PartPanel)
+                AddHandler PartPanel.MouseDown, AddressOf startDrag
+                AddHandler PartPanel.MouseMove, AddressOf whileDragging
+                AddHandler PartPanel.MouseUp, AddressOf endDrag
+
+                Dim tPart As New Label
+                tPart.AutoSize = True
+                tPart.Text = BoxConfig(x).Parts(y).PartNumber
+                tPart.Location = New Point(10, 0)
+                PartPanel.Controls.Add(tPart)
+
+                Dim tWeight As New Label
+                tWeight.AutoSize = True
+                tWeight.Text = BoxConfig(x).Parts(y).BagWeight
+                tWeight.Location = New Point(300, 0)
+                PartPanel.Controls.Add(tWeight)
+
+                Dim tQuantity As New Label
+                tQuantity.AutoSize = True
+                tQuantity.Text = BoxConfig(x).Parts(y).Bags
+                tQuantity.Location = New Point(400, 0)
+                PartPanel.Controls.Add(tQuantity)
+
+                PartPanel.Size = New Size(550, tPart.Height)
+                Count += 1
+            Next
+
+            Count = 0
+            Dim Weight As New Label
+            Weight.Text = BoxConfig(x).Weight
+            Weight.Location = New Point(10, PartPanel.Location.Y + PartPanel.Height + 12)
+            BoxPanel.Controls.Add(Weight)
+
+            BoxPanel.Size = New Size(550, Weight.Location.Y + Weight.Height + 12)
+            Board.Controls.Add(BoxPanel)
+            Start = BoxPanel.Location.Y + BoxPanel.Height + 15
+
+        Next
+    End Sub
+
     Sub ExcelWeights()
         Dim Toolbar As Panel = Me.Controls("Toolbar")
         Dim List As TreeView = Toolbar.Controls("List")
@@ -1017,13 +1309,18 @@ Public Class Manager
         SFD.OverwritePrompt = True
         SFD.FileName = RunList.Text & " Shipping Weights"
 
-        Dim xlWorkBook As Excel.Workbook = xlApp.Workbooks.Open(GetFolderPath(SpecialFolder.ApplicationData) & "\Rochester\ShippingWeights.xlsx")
+        Dim xlWorkBook As Excel.Workbook
+        If My.Computer.FileSystem.FileExists("R:\Rochester Leankit\ShippingWeights.xlsx") Then
+            xlWorkBook = xlApp.Workbooks.Open("R:\Rochester Leankit\ShippingWeights.xlsx")
+        Else
+            xlWorkBook = xlApp.Workbooks.Open(GetFolderPath(SpecialFolder.ApplicationData) & "\Rochester\ShippingWeights.xlsx")
+        End If
+
         Dim xlWorkSheet As Excel.Worksheet = xlWorkBook.Worksheets("sheet1")
         Dim xlListObject As Excel.ListObject = xlWorkSheet.ListObjects("Table1")
         Dim xlRange As Excel.Range = xlListObject.DataBodyRange
         Dim WeightArray(xlListObject.ListRows.Count, xlListObject.ListColumns.Count)
         WeightArray = xlRange.Value
-
 
         Try
             If SFD.ShowDialog = DialogResult.OK Then
@@ -1045,7 +1342,7 @@ Public Class Manager
                 For r = 0 To PartList.Count - 1
                     DataArray(r, 0) = Cards(PartList(r)).Title
                     DataArray(r, 1) = Cards(PartList(r)).LotNumber 'ExternalCardID.Substring(Cards(PartList(r)).ExternalCardID.Length - 6, 6)
-                    DataArray(r, 2) = CardSize(Cards(PartList(r)).Title, Cards(PartList(r)).LotNumber, Cards(PartList(r)).Size)
+                    'DataArray(r, 2) = CardSize(Cards(PartList(r)).Title, Cards(PartList(r)).LotNumber, Cards(PartList(r)).Size)
                     'DataArray(r, 2) = sECardID(PartList(r)).Substring(sECardID(PartList(r)).Length - 6, 6)
                     For n = 1 To xlListObject.ListRows.Count
                         If InStr(Cards(PartList(r)).Title, WeightArray(n, 1)) > 0 Then
@@ -1053,6 +1350,7 @@ Public Class Manager
                             DataArray(r, 4) = WeightArray(n, 3)
                             DataArray(r, 5) = WeightArray(n, 4)
                             DataArray(r, 6) = WeightArray(n, 5)
+                            DataArray(r, 2) = WeightArray(n, 5) * Cards(PartList(r)).Size
                         End If
                     Next
                 Next
@@ -1135,45 +1433,88 @@ Public Class Manager
                     For x = 1 To PartList.Count
                         If WeightArray(x, 9) <> 0 Then
                             For y = 1 To WeightArray(x, 9)
-                                If (WeightArray(x, 1) <> DataArray(Row, 1)) Or (CStr(WeightArray(x, 2)) <> CStr(DataArray(Row, 2))) Then
-                                    Row += 1
-                                End If
-                                DataArray(Row, 1) = WeightArray(x, 1)
-                                DataArray(Row, 2) = WeightArray(x, 2)
-                                DataArray(Row, 3) += 1
-                                DataArray(Row, 4) += WeightArray(x, 7)
-                                Run.BoxWeight += WeightArray(x, 7)
-                                '((AverageWeight - BoxWeight) < 0.5 Or (BoxWeight - AverageWeight) > 2)
-                                If Run.BoxWeight > Run.MaxWeight Then
-                                    DataArray(Row, 4) -= WeightArray(x, 7)
-                                    Run.BoxWeight -= WeightArray(x, 7)
-
-                                    If DataArray(Row, 3) > 1 Then
-                                        DataArray(Row, 3) -= 1
+                                If (WeightArray(x, 3) / WeightArray(x, 6)) > 1 Then
+                                    If (WeightArray(x, 1) <> DataArray(Row, 1)) Or (CStr(WeightArray(x, 2)) <> CStr(DataArray(Row, 2))) Then
                                         Row += 1
-                                    Else
-                                        DataArray(Row, 1) = Nothing
-                                        DataArray(Row, 2) = Nothing
                                     End If
+                                    DataArray(Row, 1) = WeightArray(x, 1)
+                                    DataArray(Row, 2) = WeightArray(x, 2)
+                                    DataArray(Row, 3) += 1
+                                    DataArray(Row, 4) += WeightArray(x, 7)
+                                    Run.BoxWeight += WeightArray(x, 7)
+                                    '((AverageWeight - BoxWeight) < 0.5 Or (BoxWeight - AverageWeight) > 2)
+                                    If Run.BoxWeight > Run.MaxWeight Then
+                                        DataArray(Row, 4) -= WeightArray(x, 7)
+                                        Run.BoxWeight -= WeightArray(x, 7)
 
-                                    DataArray(Row, 3) = "Total"
-                                    DataArray(Row, 4) = Run.BoxWeight
-                                    Box += 1
-                                    Row += 1
-                                    DataArray(Row, 0) = "Box " & Box
-                                    Run.BoxWeight = 0
-                                    y -= 1
-                                ElseIf ((((Run.AverageWeight - Run.BoxWeight) < Run.LowTolerance And (Run.AverageWeight - Run.BoxWeight) > 0) Or (Run.BoxWeight - Run.AverageWeight) > Run.HighTolerance) And Run.BoxWeight >= Run.MinWeight) And (x <> PartList.Count And y <> WeightArray(x, 9)) Then
-                                    Row += 1
-                                    DataArray(Row, 3) = "Total"
-                                    DataArray(Row, 4) = Run.BoxWeight
-                                    Box += 1
-                                    Row += 1
-                                    DataArray(Row, 0) = "Box " & Box
-                                    Run.BoxWeight = 0
+                                        If DataArray(Row, 3) > 1 Then
+                                            DataArray(Row, 3) -= 1
+                                            Row += 1
+                                        Else
+                                            DataArray(Row, 1) = Nothing
+                                            DataArray(Row, 2) = Nothing
+                                        End If
+
+                                        DataArray(Row, 3) = "Total"
+                                        DataArray(Row, 4) = Run.BoxWeight
+                                        Box += 1
+                                        Row += 1
+                                        DataArray(Row, 0) = "Box " & Box
+                                        Run.BoxWeight = 0
+                                        y -= 1
+                                    ElseIf ((((Run.AverageWeight - Run.BoxWeight) < Run.LowTolerance And (Run.AverageWeight - Run.BoxWeight) > 0) Or (Run.BoxWeight - Run.AverageWeight) > Run.HighTolerance) And Run.BoxWeight >= Run.MinWeight) And (x <> PartList.Count And y <> WeightArray(x, 9)) Then
+                                        Row += 1
+                                        DataArray(Row, 3) = "Total"
+                                        DataArray(Row, 4) = Run.BoxWeight
+                                        Box += 1
+                                        Row += 1
+                                        DataArray(Row, 0) = "Box " & Box
+                                        Run.BoxWeight = 0
+                                    End If
                                 End If
-                                'End If
+                                If WeightArray(x, 3) Mod WeightArray(x, 6) <> 0 And y = WeightArray(x, 9) Then
+                                    Row += 1
+                                    DataArray(Row, 1) = WeightArray(x, 1)
+                                    DataArray(Row, 2) = WeightArray(x, 2)
+                                    DataArray(Row, 3) = "Partial"
+                                    DataArray(Row, 4) += WeightArray(x, 7) / (WeightArray(x, 3) Mod WeightArray(x, 6))
+                                    Run.BoxWeight += WeightArray(x, 7) / (WeightArray(x, 3) Mod WeightArray(x, 6))
+                                    If Run.BoxWeight > Run.MaxWeight Then
+                                        DataArray(Row, 4) -= WeightArray(x, 7) / (WeightArray(x, 3) Mod WeightArray(x, 6))
+                                        Run.BoxWeight -= WeightArray(x, 7) / (WeightArray(x, 3) Mod WeightArray(x, 6))
+
+                                        If DataArray(Row, 3) > 1 Then
+                                            DataArray(Row, 3) -= 1
+                                            Row += 1
+                                        Else
+                                            DataArray(Row, 1) = Nothing
+                                            DataArray(Row, 2) = Nothing
+                                        End If
+
+                                        DataArray(Row, 3) = "Total"
+                                        DataArray(Row, 4) = Run.BoxWeight
+                                        Box += 1
+                                        Row += 1
+                                        DataArray(Row, 0) = "Box " & Box
+                                        Run.BoxWeight = 0
+                                        Row += 1
+                                        DataArray(Row, 1) = WeightArray(x, 1)
+                                        DataArray(Row, 2) = WeightArray(x, 2)
+                                        DataArray(Row, 3) = "Partial"
+                                        DataArray(Row, 4) += WeightArray(x, 7) / (WeightArray(x, 3) Mod WeightArray(x, 6))
+                                        Run.BoxWeight += WeightArray(x, 7) / (WeightArray(x, 3) Mod WeightArray(x, 6))
+                                    ElseIf ((((Run.AverageWeight - Run.BoxWeight) < Run.LowTolerance And (Run.AverageWeight - Run.BoxWeight) > 0) Or (Run.BoxWeight - Run.AverageWeight) > Run.HighTolerance) And Run.BoxWeight >= Run.MinWeight) And (x <> PartList.Count And y <> WeightArray(x, 9)) Then
+                                        Row += 1
+                                        DataArray(Row, 3) = "Total"
+                                        DataArray(Row, 4) = Run.BoxWeight
+                                        Box += 1
+                                        Row += 1
+                                        DataArray(Row, 0) = "Box " & Box
+                                        Run.BoxWeight = 0
+                                    End If
+                                End If
                             Next
+
                         End If
                     Next
 
@@ -1419,6 +1760,9 @@ Public Class Manager
         Try
             If Title.Substring(0, 6).ToUpper = "S02244" Then
                 Pouches = Size * 10
+                Exit Try
+            ElseIf Title.Substring(0, 6) = "S02918" Then
+                Pouches = Size * 20
                 Exit Try
             ElseIf Title.Substring(0, 1) = "0" Or Title.Substring(0, 8) = "S0013315" Or Lot.Substring(0, 2).ToUpper = "8F" Or Lot.Substring(0, 2).ToUpper = "3F" Or Title.Substring(0, 6) = "700998" Then
                 Pouches = Size * 25
